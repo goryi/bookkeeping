@@ -920,7 +920,7 @@
             </div>
 
             <!-- 版本 -->
-            <p class="text-center text-[11px] text-white/15 pt-4 font-num">v3.1.0 · build 0628</p>
+            <p class="text-center text-[11px] text-white/15 pt-4 font-num">v3.2.0 · build 0628</p>
         </section>
 
     </main>
@@ -5645,9 +5645,10 @@
 
         // === Pro AI (Multi-provider LLM) ===
         let proConversation = [];
+        let lastFailedMsg = '';
         const PRO_PROVIDERS = {
             gemini: { name: 'Gemini', models: ['gemini-2.5-flash','gemini-2.0-flash','gemini-2.5-pro'] },
-            qwen: { name: '通义千问', models: ['qwen-plus','qwen-max','qwen-turbo'] },
+            qwen: { name: '通义千问', models: ['qwen-plus','qwen-turbo','qwen-max','qwen3-235b-a22b'] },
             custom: { name: '自定义', models: [] }
         };
 
@@ -5953,10 +5954,13 @@ IMPORTANT RULES:
 - budget: Set/modify/remove budget. data: {"type":"total|category","cat":"category key (if type=category)","amount":number or 0 to remove}
 - category: For adding, use a simple lowercase key (e.g. "milk_tea"). For deleting or renaming, match existing category keys. Default icon: "tag", default color: "#7c3aed".
 - CRITICAL: reply MUST be under 50 words. Keep it short by default, only say more when genuinely needed (e.g. query results, warnings).
-- For record/modify actions, reply MUST naturally mention the amount, category, and what it's for — but weave them into a fun sentence, don't list them robotically. Examples: "又剁手了！200块花在手办上，绫波丽确实值得～" / "300 on dining — that hotpot better be worth it 🍲". Never skip these info, but keep it conversational with a short comment.`;
+- For record/modify actions, reply MUST naturally mention the amount, category, and what it's for — but weave them into a fun sentence, don't list them robotically. Examples: "又剁手了！200块花在手办上，绫波丽确实值得～" / "300 on dining — that hotpot better be worth it 🍲". Never skip these info, but keep it conversational with a short comment.
+- "改为X分类" or "移到X" means ONLY change the category, do NOT touch the description or amount. Only change what the user explicitly asks to change.
+- If user wants to move a record to a category that doesn't exist yet, do BOTH in one response: first create the category (action: category), then modify the record. Actually, return action "modify" with the new cat key — the system will auto-create unknown categories.
+- NEVER ask for confirmation on modify actions. Just do it directly. Only ask confirmation for delete.`;
 
             proConversation.push({ role: 'user', content: text });
-            if (proConversation.length > 12) proConversation = proConversation.slice(-10);
+            if (proConversation.length > 8) proConversation = proConversation.slice(-6);
 
             try {
                 const raw = await callLLMProvider(systemPrompt, proConversation);
@@ -5969,7 +5973,9 @@ IMPORTANT RULES:
                     const clean = raw.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
                     parsed = JSON.parse(clean);
                 } catch(e) {
-                    return raw;
+                    const replyMatch = raw.match(/"reply"\s*:\s*"([^"]+)"/);
+                    if (replyMatch) return replyMatch[1];
+                    return processAI(text);
                 }
 
                 if (parsed.action === 'record' && parsed.data) {
@@ -6027,7 +6033,14 @@ IMPORTANT RULES:
                     if (found && (changes.amount !== undefined || changes.cat || changes.desc || changes.type || changes.date)) {
                         pushUndo('modify', {...found});
                         if (changes.amount !== undefined) found.amount = Number(changes.amount);
-                        if (changes.cat) found.cat = changes.cat;
+                        if (changes.cat) {
+                            if (!EXPENSE_CATS[changes.cat] && !INCOME_CATS[changes.cat]) {
+                                const cats = found.type === 'income' ? INCOME_CATS : EXPENSE_CATS;
+                                cats[changes.cat] = { label: changes.cat.charAt(0).toUpperCase() + changes.cat.slice(1), icon: 'tag', color: '#7c3aed' };
+                                saveCustomCats();
+                            }
+                            found.cat = changes.cat;
+                        }
                         if (changes.desc) found.desc = changes.desc;
                         if (changes.type) found.type = changes.type;
                         if (changes.date) found.date = new Date(changes.date + 'T12:00:00').toISOString();
@@ -6092,6 +6105,8 @@ IMPORTANT RULES:
 
                 return parsed.reply || raw;
             } catch(e) {
+                lastFailedMsg = text;
+                const retryBtn = `<button onclick="retryLastMsg()" class="mt-2 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/10 text-white/70 text-[12px] active:scale-95 transition-transform"><i data-lucide="refresh-cw" class="w-3 h-3"></i>${currentLang === 'zh' ? '重试' : 'Retry'}</button>`;
                 const proBtn = `<button onclick="openProUnlock()" class="mt-2 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-cyber-purple/20 text-cyber-purple text-[12px] active:scale-95 transition-transform"><i data-lucide="settings" class="w-3 h-3"></i>${t('pro_error_switch')}</button>`;
                 if (e?.status === 401 || e?.status === 403) {
                     localStorage.removeItem('pro_ai_enabled');
@@ -6099,13 +6114,29 @@ IMPORTANT RULES:
                     return t('pro_error_invalid');
                 }
                 if (e?.status === 429) {
-                    return `${t('pro_error_rate_limit')}<br>${proBtn}<br><br>` + processAI(text);
+                    return `${t('pro_error_rate_limit')}<br>${retryBtn} ${proBtn}<br><br>` + processAI(text);
                 }
                 const cfg = getProConfig();
                 const needVpn = (cfg.provider === 'gemini');
                 const hint = needVpn ? `<br><span class="text-[12px] text-white/30">${t('pro_error_vpn_hint')}</span>` : '';
-                return `${t('pro_error_failed')}${hint}<br>${proBtn}<br><br>` + processAI(text);
+                return `${t('pro_error_failed')}${hint}<br>${retryBtn} ${proBtn}<br><br>` + processAI(text);
             }
+        }
+
+        function retryLastMsg() {
+            if (!lastFailedMsg) return;
+            const text = lastFailedMsg;
+            lastFailedMsg = '';
+            const box = document.getElementById('chat-box');
+            box.innerHTML += `<div class="ai-typing-indicator flex justify-start mb-4"><div class="glass-card text-white/50 px-4 py-3 rounded-[24px] rounded-tl-sm text-[14px] border-0 shadow-lg">${t('pro_thinking')}</div></div>`;
+            box.scrollTop = box.scrollHeight;
+            processAIWithLLM(text).then(aiRes => {
+                const typing = document.querySelector('.ai-typing-indicator');
+                if (typing) typing.remove();
+                box.innerHTML += `<div class="flex justify-start mb-4"><div class="glass-card text-white/90 px-4 py-3 rounded-[24px] rounded-tl-sm text-[16px] border-0 shadow-lg">${aiRes}</div></div>`;
+                box.scrollTop = box.scrollHeight;
+                lucide.createIcons();
+            });
         }
 
         // === Feature 1: Finish recording (shared by direct record + multi-turn) ===
