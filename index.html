@@ -665,7 +665,6 @@
             transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1);
             position: relative;
             z-index: 1;
-            touch-action: pan-y;
         }
         .tx-swipe-wrapper.swiped .tx-swipe-content { transform: translateX(-120px); }
 
@@ -923,7 +922,7 @@
             </div>
 
             <!-- 版本 -->
-            <p class="text-center text-[11px] text-white/15 pt-4 font-num">v3.3.0 · build 0628</p>
+            <p class="text-center text-[11px] text-white/15 pt-4 font-num">v3.3.2 · build 0628</p>
         </section>
 
     </main>
@@ -1908,7 +1907,7 @@
                 pro_placeholder: '粘贴 API Key...', pro_save: '激活', pro_clear: '关闭高级',
                 pro_provider_label: '供应商', pro_model_label: '模型', pro_model_name: '模型名称',
                 pro_error_invalid: 'API Key 无效，已自动关闭 Pro。请重新设置。',
-                pro_error_rate_limit: '当前供应商已限流，建议切换供应商或关闭 Pro 功能。',
+                pro_error_rate_limit: '供应商限流，已切回离线AI，可去设置换供应商',
                 pro_error_failed: '连接失败，已用离线模式回复。',
                 pro_error_vpn_hint: '该服务需要科学上网，国内推荐切换为通义千问',
                 pro_error_switch: '切换设置',
@@ -1991,7 +1990,7 @@
                 pro_placeholder: 'Paste API Key...', pro_save: 'Activate', pro_clear: 'Deactivate',
                 pro_provider_label: 'Provider', pro_model_label: 'Model', pro_model_name: 'Model Name',
                 pro_error_invalid: 'API Key invalid. Pro disabled. Please reconfigure.',
-                pro_error_rate_limit: 'Provider rate-limited. Try switching provider or disabling Pro.',
+                pro_error_rate_limit: 'Rate limited. Switched to offline AI. Try another provider in settings.',
                 pro_error_failed: 'Connection failed, using offline mode.',
                 pro_error_vpn_hint: 'This provider requires VPN in China. Try Qwen instead.',
                 pro_error_switch: 'Settings',
@@ -2074,7 +2073,7 @@
                 pro_placeholder: 'APIキーを貼り付け...', pro_save: '有効化', pro_clear: '無効化',
                 pro_provider_label: 'プロバイダー', pro_model_label: 'モデル', pro_model_name: 'モデル名',
                 pro_error_invalid: 'API Key無効。Proを無効化しました。再設定してください。',
-                pro_error_rate_limit: 'レート制限中。プロバイダーを変更するかProを無効にしてください。',
+                pro_error_rate_limit: 'レート制限。オフラインAIに切替済。設定で別プロバイダーをお試しください。',
                 pro_error_failed: '接続失敗、オフラインモードで回答。',
                 pro_error_vpn_hint: 'このサービスは中国からVPNが必要です。通義千問を推奨。',
                 pro_error_switch: '設定変更',
@@ -2157,7 +2156,7 @@
                 pro_placeholder: 'API Key 붙여넣기...', pro_save: '활성화', pro_clear: '비활성화',
                 pro_provider_label: '공급자', pro_model_label: '모델', pro_model_name: '모델명',
                 pro_error_invalid: 'API Key가 유효하지 않습니다. Pro가 비활성화되었습니다.',
-                pro_error_rate_limit: '공급자 속도 제한. 공급자를 변경하거나 Pro를 비활성화하세요.',
+                pro_error_rate_limit: '속도 제한. 오프라인 AI로 전환됨. 설정에서 다른 공급자를 시도하세요.',
                 pro_error_failed: '연결 실패, 오프라인 모드로 응답.',
                 pro_error_vpn_hint: '이 서비스는 중국에서 VPN이 필요합니다. Qwen 추천.',
                 pro_error_switch: '설정 변경',
@@ -2404,6 +2403,13 @@
             }
             renderBookSelector();
             renderAll();
+
+            document.getElementById('transaction-list').addEventListener('click', e => {
+                const wrapper = e.target.closest('.tx-swipe-wrapper');
+                if (wrapper && wrapper.classList.contains('swiped') && !e.target.closest('.tx-swipe-actions')) {
+                    wrapper.classList.remove('swiped');
+                }
+            });
 
             // Level system: check streak on load
             const _streakData = checkStreak();
@@ -3076,30 +3082,25 @@
         }
 
         function initSwipe(el) {
-            let startX = 0, startY = 0, moved = false;
-            const content = el.querySelector('.tx-swipe-content');
-            content.addEventListener('touchstart', e => { startX = e.touches[0].clientX; startY = e.touches[0].clientY; moved = false; }, {passive: true});
-            content.addEventListener('touchmove', e => {
+            let startX = 0, startY = 0;
+            el.addEventListener('touchstart', e => {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+                el._swiping = false;
+            }, {passive: true});
+            el.addEventListener('touchmove', e => {
                 const dx = e.touches[0].clientX - startX;
                 const dy = Math.abs(e.touches[0].clientY - startY);
-                if (dy > 20) return;
-                if (dx < -30) { el.classList.add('swiped'); moved = true; }
-                else if (dx > 30) { el.classList.remove('swiped'); moved = true; }
+                if (dy > 15) return;
+                if (dx < -50) { el.classList.add('swiped'); el._swiping = true; }
+                else if (dx > 50) { el.classList.remove('swiped'); el._swiping = true; }
             }, {passive: true});
-            content.addEventListener('click', e => {
-                if (moved) { moved = false; e.stopPropagation(); e.preventDefault(); return; }
-                if (el.classList.contains('swiped')) { el.classList.remove('swiped'); e.stopPropagation(); e.preventDefault(); return; }
-            });
-            const actions = el.querySelector('.tx-swipe-actions');
-            if (actions) {
-                actions.addEventListener('click', e => { e.stopPropagation(); });
-            }
         }
 
         function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
         function deleteTx(id) {
-            const idx = txs.findIndex(t => t.id === id);
+            const idx = txs.findIndex(t => String(t.id) === String(id));
             if (idx === -1) return;
             const removed = txs.splice(idx, 1)[0];
             pushUndo('delete', {...removed});
@@ -3413,6 +3414,11 @@
                 startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
             } else if (currentStatsFilter === 'year') {
                 startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+            } else if (currentStatsFilter === 'all') {
+                const earliest = txs.length > 0 ? txs.reduce((min, t) => { const d = new Date(t.date); return d < min ? d : min; }, new Date()) : new Date();
+                startDate = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
+                const diffDays = (now - startDate) / (1000 * 60 * 60 * 24);
+                if (diffDays <= 31) isDaily = true;
             } else if (currentStatsFilter === 'custom' && customStatsRange.start && customStatsRange.end) {
                 startDate = new Date(customStatsRange.start + 'T00:00:00');
                 now = new Date(customStatsRange.end + 'T23:59:59');
@@ -3621,7 +3627,14 @@
                     if (incMonthMap[k] !== undefined) incMonthMap[k] += t.amount;
                 });
 
-                labels = labelKeys.map(k => k.split('-')[1]);
+                const totalMonths = labelKeys.length;
+                const spanYears = totalMonths > 0 ? (parseInt(labelKeys[totalMonths-1].split('-')[0]) - parseInt(labelKeys[0].split('-')[0])) : 0;
+                labels = labelKeys.map((k, i) => {
+                    const [y, m] = k.split('-');
+                    if (totalMonths <= 12) return spanYears > 0 ? `${m}/${y.slice(2)}` : m;
+                    if (m === '1' || i === 0) return `${y}`;
+                    return '';
+                });
                 expensePoints = labelKeys.map(k => expMonthMap[k]);
                 incomePoints = labelKeys.map(k => incMonthMap[k]);
             }
@@ -4337,10 +4350,14 @@
              // 1. Exact category label match (highest priority)
              const allCats = {...EXPENSE_CATS, ...INCOME_CATS};
              const textNoNum = text.replace(/[\d.]+/g, '').replace(/(花了|买了|块钱|块|元)/g, '').trim();
+             const textLower = textNoNum.toLowerCase();
              for(let key in allCats) {
                 const lb = allCats[key].label;
                 const lbNoEmoji = _se(lb);
+                const lbLower = lbNoEmoji.toLowerCase();
                 if (textNoNum === lb || textNoNum === lbNoEmoji || text.includes(lb) || text.includes(lbNoEmoji)) return { key, ...allCats[key] };
+                if (textLower === lbLower || textLower.includes(lbLower) || lbLower.includes(textLower)) return { key, ...allCats[key] };
+                if (key.toLowerCase() === textLower) return { key, ...allCats[key] };
              }
              // 2. Check learned category memory
              for (let keyword in catMemory) {
@@ -4367,6 +4384,36 @@
              if (/^(打车|坐车|开车|骑车)/.test(text)) return { key: 'transport', ...EXPENSE_CATS['transport'] };
              if (/^(买了?|逛)/.test(text) && !/(买菜|买饭|买奶茶)/.test(text)) return { key: 'shopping', ...EXPENSE_CATS['shopping'] };
              return null;
+        }
+
+        function fuzzyMatchCat(input, txType) {
+            const _se = s => s.replace(/[\u{1F300}-\u{1FAD6}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, '').trim();
+            const allCats = {...EXPENSE_CATS, ...INCOME_CATS};
+            const inputClean = _se(input).toLowerCase();
+            if (!inputClean) return null;
+            let best = null, bestDist = Infinity;
+            for (let key in allCats) {
+                const lb = _se(allCats[key].label).toLowerCase();
+                if (!lb) continue;
+                const dist = levenshtein(inputClean, lb);
+                if (dist <= 1 && dist < bestDist) { best = { key, ...allCats[key] }; bestDist = dist; }
+            }
+            return best;
+        }
+
+        function levenshtein(a, b) {
+            if (a === b) return 0;
+            if (!a.length) return b.length;
+            if (!b.length) return a.length;
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+            for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    matrix[i][j] = b[i-1] === a[j-1] ? matrix[i-1][j-1] : Math.min(matrix[i-1][j-1]+1, matrix[i][j-1]+1, matrix[i-1][j]+1);
+                }
+            }
+            return matrix[b.length][a.length];
         }
 
         function learnCategory(desc, catKey) {
@@ -5357,7 +5404,7 @@
             }
 
             // Detect contextual modify
-            const isContextModify = text.match(/(这个|上一个|那个|刚才|上一笔)/) && text.match(/(换|变成|改成|改为|改名|换成|换下)/);
+            const isContextModify = text.match(/(这个|这一笔|上一个|那个|刚才|上一笔|那一笔)/) && text.match(/(换|变成|改成|改为|改名|换成|换下)/) && !text.match(/(分类|类别|类型)/)
 
             // Determine intent
             const isQuery = text.match(/(多少|查询|统计|总共|一共|合计)/) ||
@@ -5481,13 +5528,17 @@
                  const directCatChange = text.match(/^(.+?)(?:改为|改成|换成|归为|归到|是)(.+?)(?:的)?$/);
                  let directCatTarget = null;
                  let directCatNew = null;
+                 let directCatRaw = null;
                  if (directCatChange && !amountChange && !descChange && !catChange) {
-                     const possibleDesc = directCatChange[1].replace(/(把|将|修改)/g, '').trim();
+                     const possibleDesc = directCatChange[1].replace(/(把|将|修改|这一笔|这个|那个|上一笔)/g, '').trim();
                      const possibleCat = directCatChange[2].replace(/(分类|类别|类型)/g, '').trim();
                      const parsedCat = parseCategoryForAI(possibleCat);
                      if (parsedCat) {
                          directCatTarget = possibleDesc;
                          directCatNew = parsedCat;
+                     } else if (possibleCat) {
+                         directCatTarget = possibleDesc;
+                         directCatRaw = possibleCat;
                      }
                  }
 
@@ -5495,13 +5546,15 @@
                  let keyWord2 = cleanText.replace(/(修改|改成|改为|更新|把|的|金额|备注|描述|分类|类别|类型|名字|名称|归为|归到)/g, "").replace(/\d+(\.\d+)?/g, '').trim();
                  if (directCatTarget) keyWord2 = directCatTarget;
                  else {
+                     const afterChange = cleanText.match(/(?:改为|改成|换成|归为|归到)(.+)/);
+                     if (afterChange) keyWord2 = keyWord2.replace(afterChange[1].trim(), '').trim();
                      const allCatLabels = Object.values({...EXPENSE_CATS, ...INCOME_CATS}).map(c => c.label);
                      allCatLabels.forEach(l => { keyWord2 = keyWord2.replace(l, ''); });
                      keyWord2 = keyWord2.replace(/(餐饮|交通|购物|娱乐|居住|数码|吃|喝)/g, '').trim();
                  }
 
                  let targetTx = null;
-                 if (text.match(/(这个|上一个|那个|刚才|上一笔)/) && lastAiTxId) {
+                 if (text.match(/(这个|这一笔|上一个|那个|刚才|上一笔|那一笔)/) && lastAiTxId) {
                      targetTx = txs.find(t => t.id === lastAiTxId);
                  }
                  if (!targetTx && lastAiTxId && !keyWord2) {
@@ -5529,15 +5582,37 @@
                      changes.push(ai('desc_to', targetTx.desc));
                  }
                  if (catChange) {
-                     const newCatInfo = parseCategoryForAI(catChange[1]);
+                     const newCatInfo = parseCategoryForAI(catChange[1]) || fuzzyMatchCat(catChange[1].trim(), targetTx.type);
                      if (newCatInfo) {
                          targetTx.cat = newCatInfo.key;
                          changes.push(ai('cat_to', newCatInfo.label));
+                     } else {
+                         const rawCat = catChange[1].trim();
+                         const catKey = rawCat.toLowerCase();
+                         const cats = targetTx.type === 'income' ? INCOME_CATS : EXPENSE_CATS;
+                         cats[catKey] = { label: rawCat, icon: 'tag', color: '#7c3aed' };
+                         saveCustomCats();
+                         targetTx.cat = catKey;
+                         changes.push(ai('cat_to', rawCat));
                      }
                  }
                  if (directCatNew && changes.length === 0) {
                      targetTx.cat = directCatNew.key;
                      changes.push(ai('cat_to', directCatNew.label));
+                 }
+                 if (!directCatNew && directCatRaw && changes.length === 0) {
+                     const fuzzy = fuzzyMatchCat(directCatRaw, targetTx.type);
+                     if (fuzzy) {
+                         targetTx.cat = fuzzy.key;
+                         changes.push(ai('cat_to', fuzzy.label));
+                     } else {
+                         const catKey = directCatRaw.toLowerCase();
+                         const cats = targetTx.type === 'income' ? INCOME_CATS : EXPENSE_CATS;
+                         cats[catKey] = { label: directCatRaw, icon: 'tag', color: '#7c3aed' };
+                         saveCustomCats();
+                         targetTx.cat = catKey;
+                         changes.push(ai('cat_to', directCatRaw));
+                     }
                  }
 
                  if (changes.length === 0 && amount > 0) {
@@ -5759,8 +5834,8 @@
                             <a id="pro-help-link" href="#" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyber-purple/15 text-cyber-purple text-[13px] font-normal active:scale-95 transition-transform"><i data-lucide="external-link" class="w-3.5 h-3.5"></i><span id="pro-help-link-text">前往获取</span></a>
                         </div>
                         <div class="flex gap-3">
-                            ${isActive ? `<button onclick="clearProKey()" class="flex-1 py-3 rounded-full bg-white/5 text-white/60 text-[15px] font-medium active:scale-95 transition-transform">${t('pro_clear')}</button>` : ''}
-                            <button onclick="saveProKey()" class="flex-1 py-3 rounded-full bg-cyber-purple text-white text-[15px] font-medium active:scale-95 transition-transform">${t('pro_save')}</button>
+                            ${isActive ? `<button id="pro-btn-clear" class="flex-1 py-3 rounded-full bg-white/5 text-white/60 text-[15px] font-medium active:scale-95 transition-transform">${t('pro_clear')}</button>` : ''}
+                            <button id="pro-btn-save" class="flex-1 py-3 rounded-full bg-cyber-purple text-white text-[15px] font-medium active:scale-95 transition-transform">${t('pro_save')}</button>
                         </div>
                     </div>
                 </div>`;
@@ -5768,6 +5843,9 @@
             el.id = 'pro-panel';
             el.innerHTML = html;
             document.body.appendChild(el);
+            document.getElementById('pro-btn-save').addEventListener('click', saveProKey);
+            const clearBtn = document.getElementById('pro-btn-clear');
+            if (clearBtn) clearBtn.addEventListener('click', clearProKey);
             lucide.createIcons();
             onProProviderChange();
         }
@@ -5815,7 +5893,8 @@
             const models = PRO_PROVIDERS[provider]?.models || [];
             const keyInput = document.getElementById('pro-key-input');
             if (keyInput) {
-                keyInput.value = (provider === cfg.provider) ? (cfg.key || '') : '';
+                const savedKeys = JSON.parse(localStorage.getItem('pro_keys') || '{}');
+                keyInput.value = savedKeys[provider] || (provider === cfg.provider ? (cfg.key || '') : '');
             }
             const customUrlWrap = document.getElementById('pro-custom-url-wrap');
             const customModelWrap = document.getElementById('pro-custom-model-wrap');
@@ -5853,16 +5932,22 @@
             if (el) el.remove();
         }
         function saveProKey() {
-            const key = document.getElementById('pro-key-input').value.trim();
-            if (!key) return;
-            const provider = document.getElementById('pro-provider').value;
-            const model = provider === 'custom' ? (document.getElementById('pro-custom-model').value.trim() || 'gpt-4o-mini') : document.getElementById('pro-model').value;
+            try {
+            const key = document.getElementById('pro-key-input')?.value.trim();
+            if (!key) { showToast(t('pro_no_key') || '请先粘贴 API Key', 'error'); return; }
+            const provider = document.getElementById('pro-provider')?.value;
+            if (!provider) { showToast('请选择供应商', 'error'); return; }
+            const model = provider === 'custom' ? (document.getElementById('pro-custom-model')?.value.trim() || 'gpt-4o-mini') : document.getElementById('pro-model')?.value;
+            if (!model) { showToast('请选择模型', 'error'); return; }
             const cfg = { key, provider, model };
             if (provider === 'custom') {
-                cfg.customUrl = document.getElementById('pro-custom-url').value.trim();
+                cfg.customUrl = document.getElementById('pro-custom-url')?.value.trim();
                 cfg.customModel = cfg.model;
             }
             localStorage.setItem('pro_config', JSON.stringify(cfg));
+            const savedKeys = JSON.parse(localStorage.getItem('pro_keys') || '{}');
+            savedKeys[provider] = key;
+            localStorage.setItem('pro_keys', JSON.stringify(savedKeys));
             if (provider === 'gemini') {
                 localStorage.setItem('gemini_api_key', key);
             }
@@ -5871,6 +5956,7 @@
             closeProPanel();
             proConversation = [];
             showToast(t('pro_activated'), 'success');
+            } catch(e) { showToast('激活失败: ' + e.message, 'error'); }
         }
         function clearProKey() {
             localStorage.removeItem('pro_ai_enabled');
@@ -5998,8 +6084,10 @@ IMPORTANT RULES:
 - For "delete all" or "clear all data" requests, use action "delete" with data: {"match":"__ALL__"}. Always ask for confirmation first.
 - budget: Set/modify/remove budget. data: {"type":"total|category","cat":"category key (if type=category)","amount":number or 0 to remove}
 - category: For adding, use a simple lowercase key (e.g. "milk_tea"). For deleting or renaming, match existing category keys. Default icon: "tag", default color: "#7c3aed".
+- Default type is "expense". Only use "income" when user EXPLICITLY says income words (收入/工资/薪水/奖金/赚了/进账/到账/转入/red packet received). If ambiguous, always default to expense.
+- Category selection: choose the category whose meaning best matches what the item IS, not just "something you buy". E.g. a clock/watch → 购物 or 日用; a toy/figure/collectible → 玩具. Don't put non-toy items into 玩具 just because the category exists.
 - CRITICAL: reply MUST be under 50 words. Keep it short by default, only say more when genuinely needed (e.g. query results, warnings).
-- For record/modify actions, reply MUST naturally mention the amount, category, and what it's for — but weave them into a fun sentence, don't list them robotically. Examples: "又剁手了！200块花在手办上，绫波丽确实值得～" / "300 on dining — that hotpot better be worth it 🍲". Never skip these info, but keep it conversational with a short comment.
+- For record/modify actions, reply MUST mention: 1) amount with sign (expense use -, income use +) 2) category LABEL (e.g. 购物/餐饮/娱乐, NOT the desc) 3) desc. Weave into a fun sentence. Examples: "购物-50，绫波丽到手！剁手快乐～" / "餐饮-300，火锅真香！" / "salary +8000, payday!~". Never skip category label. IMPORTANT: expense MUST use minus sign "-", income MUST use plus sign "+".
 - "改为X分类" or "移到X" means ONLY change the category, do NOT touch the description or amount. Only change what the user explicitly asks to change.
 - If user wants to move a record to a category that doesn't exist yet, do BOTH in one response: first create the category (action: category), then modify the record. Actually, return action "modify" with the new cat key — the system will auto-create unknown categories.
 - NEVER ask for confirmation on modify actions. Just do it directly. Only ask confirmation for delete.`;
@@ -6025,11 +6113,23 @@ IMPORTANT RULES:
 
                 if (parsed.action === 'record' && parsed.data) {
                     const d = parsed.data;
+                    let rCat = d.cat || 'other';
+                    if (!EXPENSE_CATS[rCat] && !INCOME_CATS[rCat]) {
+                        const matched = parseCategoryForAI(rCat) || fuzzyMatchCat(rCat, d.type || 'expense');
+                        rCat = matched ? matched.key : 'other';
+                    }
+                    if (rCat === 'other' && d.desc) {
+                        const betterCat = parseCategoryForAI(d.desc) || parseCategoryForAI(text);
+                        if (betterCat) rCat = betterCat.key;
+                    }
+                    let rType = d.type || 'expense';
+                    if (rType === 'income' && EXPENSE_CATS[rCat]) rType = 'expense';
+                    if (Number(d.amount) < 0) rType = 'expense';
                     const tx = {
                         id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-                        amount: Number(d.amount),
-                        type: d.type || 'expense',
-                        cat: d.cat || 'other',
+                        amount: Math.abs(Number(d.amount)),
+                        type: rType,
+                        cat: rCat,
                         desc: d.desc || '',
                         date: d.date ? new Date(d.date + 'T12:00:00').toISOString() : new Date().toISOString()
                     };
@@ -6067,24 +6167,35 @@ IMPORTANT RULES:
                     if (match) {
                         found = txs.find(tx => (tx.desc && tx.desc.includes(match)) || String(tx.amount) === match || tx.id === match || tx.cat === match);
                     }
+                    if (!found && match) {
+                        found = txs.find(tx => tx.desc && (tx.desc.includes(match) || match.includes(tx.desc)));
+                    }
                     if (!found && lastAiTxId) {
                         found = txs.find(tx => tx.id === lastAiTxId);
                     }
                     if (!found && match) {
-                        const words = match.split(/\s+/);
-                        found = txs.find(tx => words.some(w => w && tx.desc && tx.desc.includes(w)));
+                        const words = match.replace(/[\d.]+/g,'').split(/\s+/).filter(w => w.length > 0);
+                        found = txs.find(tx => words.some(w => tx.desc && tx.desc.includes(w)));
+                    }
+                    if (!found) {
+                        found = txs[txs.length - 1];
                     }
                     const changes = d.changes || d;
                     if (found && (changes.amount !== undefined || changes.cat || changes.desc || changes.type || changes.date)) {
                         pushUndo('modify', {...found});
                         if (changes.amount !== undefined) found.amount = Number(changes.amount);
                         if (changes.cat) {
-                            if (!EXPENSE_CATS[changes.cat] && !INCOME_CATS[changes.cat]) {
-                                const cats = found.type === 'income' ? INCOME_CATS : EXPENSE_CATS;
-                                cats[changes.cat] = { label: changes.cat.charAt(0).toUpperCase() + changes.cat.slice(1), icon: 'tag', color: '#7c3aed' };
-                                saveCustomCats();
+                            let catKey = changes.cat;
+                            if (!EXPENSE_CATS[catKey] && !INCOME_CATS[catKey]) {
+                                const fuzzy = parseCategoryForAI(catKey) || fuzzyMatchCat(catKey, found.type);
+                                if (fuzzy) { catKey = fuzzy.key; }
+                                else {
+                                    const cats = found.type === 'income' ? INCOME_CATS : EXPENSE_CATS;
+                                    cats[catKey] = { label: catKey.charAt(0).toUpperCase() + catKey.slice(1), icon: 'tag', color: '#7c3aed' };
+                                    saveCustomCats();
+                                }
                             }
-                            found.cat = changes.cat;
+                            found.cat = catKey;
                         }
                         if (changes.desc) found.desc = changes.desc;
                         if (changes.type) found.type = changes.type;
@@ -6094,7 +6205,7 @@ IMPORTANT RULES:
                         const modFallback = currentLang === 'zh' ? `已修改: ${found.type==='income'?'收入':'支出'}${found.amount}元，分类：${modCatLabel}，备注：${found.desc||'无'}` : `Updated: ${found.type} ${found.amount}, cat: ${modCatLabel}, note: ${found.desc||'none'}`;
                         return parsed.reply || modFallback;
                     }
-                    return parsed.reply || (currentLang === 'zh' ? '没有找到匹配的记录' : 'No matching records found');
+                    return currentLang === 'zh' ? '没有找到匹配的记录' : 'No matching records found';
                 }
 
                 if (parsed.action === 'budget' && parsed.data) {
@@ -6159,7 +6270,10 @@ IMPORTANT RULES:
                     return t('pro_error_invalid');
                 }
                 if (e?.status === 429) {
-                    return `${t('pro_error_rate_limit')}<br>${retryBtn} ${proBtn}<br><br>` + processAI(text);
+                    localStorage.removeItem('pro_ai_enabled');
+                    updateProStatus();
+                    const offlineReply = processAI(text);
+                    return `<span class="text-[12px] text-white/40">${t('pro_error_rate_limit')}</span><br><br>` + offlineReply;
                 }
                 const cfg = getProConfig();
                 const needVpn = (cfg.provider === 'gemini');
@@ -6393,7 +6507,7 @@ IMPORTANT RULES:
                 const [fy, fm] = (dateFilterState.value || '').split('-').map(Number);
                 filterStart = new Date(fy, fm - 1, 1);
                 filterEnd = new Date(fy, fm, 0, 23, 59, 59);
-                periodLabel = (fy === currentYear && fm - 1 === currentMonth) ? t('month_expense') : `${fm}${currentLang==='zh'?'月':'/'} ${expWord}`;
+                periodLabel = (fy === currentYear && fm - 1 === currentMonth) ? t('month_expense') : (fy === currentYear ? `${fm}${currentLang==='zh'?'月':'/'}` : `${fy}.${fm}`) + ` ${expWord}`;
                 incomeLabel = t('income');
             } else if (mode === 'year') {
                 const fy = parseInt(dateFilterState.value);
@@ -6404,15 +6518,17 @@ IMPORTANT RULES:
             } else if (mode === 'day') {
                 filterStart = new Date(dateFilterState.value + 'T00:00:00');
                 filterEnd = new Date(dateFilterState.value + 'T23:59:59');
-                const dm = filterStart.getMonth() + 1, dd = filterStart.getDate();
-                periodLabel = `${dm}/${dd} ${expWord}`;
+                const dy = filterStart.getFullYear(), dm = filterStart.getMonth() + 1, dd = filterStart.getDate();
+                periodLabel = (dy === currentYear ? `${dm}/${dd}` : `${dy}.${dm}.${dd}`) + ` ${expWord}`;
                 incomeLabel = t('income');
             } else if (mode === 'range') {
                 filterStart = new Date(dateFilterState.start + 'T00:00:00');
                 filterEnd = new Date(dateFilterState.end + 'T23:59:59');
-                const sm = filterStart.getMonth() + 1, sd = filterStart.getDate();
-                const em = filterEnd.getMonth() + 1, ed = filterEnd.getDate();
-                periodLabel = `${sm}/${sd}-${em}/${ed} ${expWord}`;
+                const sy = filterStart.getFullYear(), sm = filterStart.getMonth() + 1, sd = filterStart.getDate();
+                const ey = filterEnd.getFullYear(), em = filterEnd.getMonth() + 1, ed = filterEnd.getDate();
+                const rangeStart = sy === currentYear ? `${sm}/${sd}` : `${sy}.${sm}.${sd}`;
+                const rangeEnd = ey === currentYear ? `${em}/${ed}` : `${ey}.${em}.${ed}`;
+                periodLabel = `${rangeStart}-${rangeEnd} ${expWord}`;
                 incomeLabel = t('income');
             } else {
                 filterStart = new Date(currentYear, currentMonth, 1);
@@ -6870,16 +6986,16 @@ IMPORTANT RULES:
 
                 wrapper.innerHTML = `
                     <div class="tx-swipe-actions">
-                        <button onclick="event.stopPropagation();openEdit('${tx.id}')" class="w-14 h-full flex flex-col items-center justify-center bg-cyber-purple/80 rounded-xl text-white gap-0.5">
+                        <button class="tx-edit-btn w-14 h-full flex flex-col items-center justify-center bg-cyber-purple/80 rounded-xl text-white gap-0.5">
                             <i data-lucide="pencil" class="w-4 h-4"></i>
                             <span class="text-[9px]">${t('manage')}</span>
                         </button>
-                        <button onclick="event.stopPropagation();deleteTx('${tx.id}')" class="w-14 h-full flex flex-col items-center justify-center bg-red-500/80 rounded-xl text-white gap-0.5">
+                        <button class="tx-delete-btn w-14 h-full flex flex-col items-center justify-center bg-red-500/80 rounded-xl text-white gap-0.5">
                             <i data-lucide="trash-2" class="w-4 h-4"></i>
                             <span class="text-[9px]">${t('delete')}</span>
                         </button>
                     </div>
-                    <div class="tx-swipe-content group rounded-[12px] bg-[#110F17] px-4 h-[56px] flex items-center backdrop-blur-xl cursor-pointer" onclick="openEdit('${tx.id}')">
+                    <div class="tx-swipe-content group rounded-[12px] bg-[#110F17] px-4 h-[56px] flex items-center backdrop-blur-xl cursor-pointer">
                         <div class="flex items-center justify-between w-full">
                             <div class="flex items-center gap-3">
                                 <i data-lucide="${c.icon||'tag'}" class="w-[18px] h-[18px] shrink-0"
@@ -6898,6 +7014,12 @@ IMPORTANT RULES:
                         </div>
                     </div>
                 `;
+                const txId = String(tx.id);
+                wrapper.querySelector('.tx-swipe-content').addEventListener('click', () => {
+                    if (!wrapper._swiping && !wrapper.classList.contains('swiped')) openEdit(txId);
+                });
+                wrapper.querySelector('.tx-edit-btn').addEventListener('click', () => openEdit(txId));
+                wrapper.querySelector('.tx-delete-btn').addEventListener('click', () => deleteTx(txId));
                 initSwipe(wrapper);
                 list.appendChild(wrapper);
             });
@@ -7121,10 +7243,14 @@ IMPORTANT RULES:
             if (!editingCatKey) return;
             const cats = currentManageType === 'expense' ? EXPENSE_CATS : INCOME_CATS;
             const label = cats[editingCatKey]?.label || '';
+            const fallback = currentManageType === 'expense' ? 'other' : 'other_in';
+            txs.forEach(tx => { if (tx.cat === editingCatKey) tx.cat = fallback; });
+            saveTxs();
             delete cats[editingCatKey];
             saveCustomCats();
             closeEditCategory();
             renderCategoryList();
+            renderAll();
             showToast(`${t('removed_cat')}「${label}」`);
         }
 
@@ -7208,9 +7334,13 @@ IMPORTANT RULES:
         function removeCategory(key) {
             const cats = currentManageType === 'expense' ? EXPENSE_CATS : INCOME_CATS;
             const label = cats[key]?.label || '';
+            const fallback = currentManageType === 'expense' ? 'other' : 'other_in';
+            txs.forEach(tx => { if (tx.cat === key) tx.cat = fallback; });
+            saveTxs();
             delete cats[key];
             saveCustomCats();
             renderCategoryList();
+            renderAll();
             showToast(`${t('removed_cat')}「${label}」`);
         }
 
@@ -7337,7 +7467,7 @@ IMPORTANT RULES:
         }
 
         function openEdit(id) {
-            const tx = txs.find(x => x.id === id);
+            const tx = txs.find(x => String(x.id) === String(id));
             if(!tx) return;
             document.getElementById('modal-title').innerText = t('modal_edit');
             document.getElementById('e-id').value = tx.id;
