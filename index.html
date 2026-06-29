@@ -102,7 +102,7 @@
             -webkit-tap-highlight-color: transparent;
             padding-bottom: env(safe-area-inset-bottom);
             overflow-x: hidden;
-            background: radial-gradient(140% 50% at 50% 0%, rgba(124,58,237,0.4) 0%, rgba(88,28,195,0.15) 55%, transparent 100%) no-repeat, #000;
+            background: radial-gradient(120% 35% at 50% 0%, rgba(124,58,237,0.35) 0%, rgba(88,28,195,0.12) 45%, transparent 100%) no-repeat, #000;
             background-attachment: fixed;
             min-height: 100vh;
         }
@@ -671,6 +671,9 @@
             transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1);
             position: relative;
             z-index: 1;
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(40px) saturate(1.2) brightness(0.95);
+            -webkit-backdrop-filter: blur(40px) saturate(1.2) brightness(0.95);
         }
         .tx-swipe-wrapper.swiped .tx-swipe-content { transform: translateX(-120px); }
 
@@ -927,7 +930,7 @@
             </div>
 
             <!-- 版本 -->
-            <p class="text-center text-[11px] text-white/15 pt-4 font-num">v3.4.0 · build 0629</p>
+            <p class="text-center text-[11px] text-white/15 pt-4 font-num">v3.4.1 · build 0629</p>
         </section>
 
     </main>
@@ -7006,7 +7009,7 @@ IMPORTANT RULES:
                             <span class="text-[9px]">${t('delete')}</span>
                         </button>
                     </div>
-                    <div class="tx-swipe-content group rounded-[12px] bg-[#110F17] px-4 h-[56px] flex items-center backdrop-blur-xl cursor-pointer">
+                    <div class="tx-swipe-content group rounded-[12px] px-4 h-[56px] flex items-center cursor-pointer">
                         <div class="flex items-center justify-between w-full">
                             <div class="flex items-center gap-3">
                                 <i data-lucide="${c.icon||'tag'}" class="w-[18px] h-[18px] shrink-0"
